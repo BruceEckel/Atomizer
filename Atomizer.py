@@ -1,14 +1,26 @@
 # -*- coding: windows-1252 -*-
 """
 Takes "Filtered HTML" output from Word 2010 and parses it into chapters, then turns
-all tagged types into classes
+all tagged types into classes. Ultimate goal: extract contents
+of book into AsciiDoc format for rapid creation of seminar slides.
 Uses "Builder" design pattern, also chain of responsibility
+TODO: generate example output files, compile as test
 """
 import re, glob, string, itertools, collections, bs4
 from bs4 import BeautifulSoup, UnicodeDammit
 from pprint import pprint, pformat
 
 trace = file("_OutputTrace.txt", "w")
+
+def clean(line):
+  line = repr(line)
+  line = line.replace(r"\u2026", "...")
+  line = line.replace(r"\xa0", " ")
+  line = line.replace(r"\'", "'")
+  line = line.replace(r"\\", "_dblbackslsh_")
+  line = line.replace(r"\n", " ")
+  line = line.replace("_dblbackslsh_", "\\")
+  return line[:-1]
 
 bookElementGrabbers = []
 
@@ -50,8 +62,10 @@ def addGrabber(BookElementClass):
 class BookElement(object):
   matchStr = "Non Matching"
   def __init__(self, tag): self.tag = tag
+  def tagname(self): 
+    return "\n[" + self.__class__.__name__ + "]\n"
   def __repr__(self): 
-    return "\n[" + self.__class__.__name__ + "]\n" + repr(self.tag)
+    return  self.tagname() + repr(self.tag)
 
 class Paragraph(BookElement):
   matchStr = "MsoNormal"
@@ -62,6 +76,11 @@ class Paragraph(BookElement):
       return True
     return False
   bookElementGrabbers.append(grabber)
+  def __repr__(self): 
+    return self.tagname() + \
+      repr(self.tag.get_text())
+      #repr(self.tag.encode("windows-1252"))
+
 
 def testForCodeNumber(tag):
   return  type(tag) is bs4.element.Tag and \
@@ -82,16 +101,6 @@ class Code(BookElement):
       return True
     return False
   bookElementGrabbers.append(grabber)
-
-def clean(line):
-  line = repr(line)
-  line = line.replace(r"\u2026", "...")
-  line = line.replace(r"\xa0", " ")
-  line = line.replace(r"\'", "'")
-  line = line.replace(r"\\", "_dblbackslsh_")
-  line = line.replace(r"\n", " ")
-  line = line.replace("_dblbackslsh_", "\\")
-  return line[:-1]
 
 def exampleGrabber(tag, bookBuilder):
   if Code.matchStr in tag['class']:
@@ -124,8 +133,7 @@ class Example(BookElement):
     return self.finished
 
   def __repr__(self):
-    return "\n[" + self.__class__.__name__ + "]\n" + self.finish()
-
+    return self.tagname() + self.finish()
 
 def codeFragmentGrabber(tag, bookBuilder):
   if Code.matchStr in tag['class']:
@@ -153,6 +161,11 @@ class ExerciseHeader(BookElement):
 class ExerciseX(BookElement):
   matchStr = "Exercise"
 
+@addGrabber
+class Quote(BookElement):
+  matchStr = "MsoQuote"
+
+
 class NavigableString(BookElement): pass
 class NotTag(BookElement): pass
 class Heading2(BookElement): pass
@@ -163,8 +176,8 @@ class SolnsLink(BookElement):
   matchStr = "SolnsLink"
 
 @addGrabber
-class BulletList(BookElement):
-  matchStr = "TODO"
+class Bullet(BookElement):
+  matchStr = "Bulleted"
 
 @addGrabber
 class NumberedList(BookElement):
@@ -215,17 +228,33 @@ class Chapter(object):
     print >>trace, self.rawExercises
 
 
+def seminarSubset(chapters):
+  summarized = collections.OrderedDict(chapters)
+  for cn in summarized.keys():
+    if cn == "Summary 1": break
+    del summarized[cn]
+  for cn in summarized.keys()[1:]:
+    if cn == "Summary 2": break
+    del summarized[cn]
+  for cn in reversed(summarized.keys()):
+    if cn == "Appendix B: Calling Scala from Java": break
+    del summarized[cn]
+  return summarized  
+
+
 if __name__ == "__main__":
   chapters = Chapter.chapterize(open("AtomicScalaCleaned.html", "rU").read())
   # test = chapters["Comprehensions"]
   # test = chapters["Functions as Objects"]
   # print >>trace, test.header()
   # pprint(test.elements, trace)
-  for chap in chapters.values():
+  summarized = seminarSubset(chapters)
+  for chap in summarized.values():
     print >>trace, chap.header()
     for el in chap.elements:
-      if type(el) is Example or type(el) is CodeFragment:
-        print >>trace, el
+      print >>trace, el
+      # if type(el) is Example or type(el) is CodeFragment:
+      #   print >>trace, el
   #print test.elements[25]
   # trace2 = file("_OutputTrace2.txt", "w")
   # for e in test.soup:
