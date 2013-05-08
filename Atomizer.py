@@ -22,11 +22,11 @@ def clean(line):
   line = line.replace("_dblbackslsh_", "\\")
   return line[:-1]
 
-bookElementGrabbers = []
 
 class BookBuilder(object):
+  grabbers = []
   def __init__(self, soup):
-    self.grabbers = list(bookElementGrabbers) # Copy
+    self.grabbers = list(BookBuilder.grabbers) # Copy
     self.book = []
     for tag in soup:
       self.transform(tag)
@@ -76,7 +76,7 @@ class Paragraph(BookElement):
         bookBuilder.book.append(Paragraph(tag))
       return True
     return False
-  bookElementGrabbers.append(grabber)
+  BookBuilder.grabbers.append(grabber)
   
   def adoc(self): 
     return "- " + repr(self.tag.get_text())
@@ -102,7 +102,7 @@ class Code(BookElement):
         bookBuilder.grabbers.insert(0, CodeFragment.grabber)
       return True
     return False
-  bookElementGrabbers.append(grabber)
+  BookBuilder.grabbers.append(grabber)
 
 
 class Example(BookElement):
@@ -180,7 +180,7 @@ class NumberedList(BookElement):
       bookBuilder.grabbers.insert(0, NumberedList.subsequentGrabber)
       return True
     return False
-  bookElementGrabbers.append(grabber)
+  BookBuilder.grabbers.append(grabber)
 
   @staticmethod
   def subsequentGrabber(tag, bookBuilder):
@@ -228,7 +228,7 @@ def addGrabber(BookElementClass):
       bookBuilder.book.append(BookElementClass(tag))
       return True
     return False
-  bookElementGrabbers.append(grabber)
+  BookBuilder.grabbers.append(grabber)
   return BookElementClass
 
 @addGrabber
