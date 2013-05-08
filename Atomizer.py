@@ -6,277 +6,248 @@ of book into AsciiDoc format for rapid creation of seminar slides.
 Uses "Builder" design pattern, also chain of responsibility
 TODO: generate example output files, compile as test
 """
-import re
-import glob
-import string
-import itertools
-import collections
-import bs4
+import re, glob, string, itertools, collections, bs4
 from bs4 import BeautifulSoup, UnicodeDammit
 from pprint import pprint, pformat
 import sys
 sys.stdout = file("OutputTrace.txt", 'w')
 
-
 def clean(line):
-    line = repr(line)
-    line = line.replace(r"\u2026", "...")
-    line = line.replace(r"\xa0", " ")
-    line = line.replace(r"\'", "'")
-    line = line.replace(r"\\", "_dblbackslsh_")
-    line = line.replace(r"\n", " ")
-    line = line.replace("_dblbackslsh_", "\\")
-    return line[:-1]
+  line = repr(line)
+  line = line.replace(r"\u2026", "...")
+  line = line.replace(r"\xa0", " ")
+  line = line.replace(r"\'", "'")
+  line = line.replace(r"\\", "_dblbackslsh_")
+  line = line.replace(r"\n", " ")
+  line = line.replace("_dblbackslsh_", "\\")
+  return line[:-1]
 
 
 class BookBuilder(object):
-    grabbers = []
+  grabbers = []
+  def __init__(self, soup):
+    self.grabbers = list(BookBuilder.grabbers) # Copy
+    self.book = []
+    for tag in soup:
+      self.transform(tag)
 
-    def __init__(self, soup):
-        self.grabbers = list(BookBuilder.grabbers)  # Copy
-        self.book = []
-        for tag in soup:
-            self.transform(tag)
-
-    def transform(self, tag):
-        if type(tag) is bs4.element.NavigableString:
-            if tag.string == u'\n':
-                return
-        if type(tag) is bs4.element.Tag:
-            if tag.string == u'\n':
-                return
-            if tag.name == "h2":
-                if tag.string == "Exercises":
-                    return self.book.append(ExerciseHeader())
-                return self.book.append(Heading2(tag))
-            if tag.name == "h3":
-                return self.book.append(Heading3(tag))
-            if "class" in tag:
-                for grab in list(self.grabbers):
-                    if grab(tag, self):
-                        return
-        self.book.append(NotTag(tag))  # Catch all that don't match
+  def transform(self, tag):
+    if type(tag) is bs4.element.NavigableString:
+      if tag.string == u'\n': return
+    if type(tag) is bs4.element.Tag:
+      if tag.string == u'\n': return
+      if tag.name == "h2":
+        if tag.string == "Exercises":
+          return self.book.append(ExerciseHeader())
+        return self.book.append(Heading2(tag))
+      if tag.name == "h3":
+        return self.book.append(Heading3(tag))
+      if tag.has_key("class"):
+        for grab in list(self.grabbers):
+          if grab(tag, self):
+            return
+    self.book.append(NotTag(tag)) # Catch all that don't match
 
 
 ############ BookElements ####################################
 
 class BookElement(object):
-    matchStr = "Non Matching"
+  matchStr = "Non Matching"
 
-    def __init__(self, tag):
-        self.tag = tag
+  def __init__(self, tag): self.tag = tag
 
-    def tagname(self):
-        return "\n[" + self.__class__.__name__ + "]\n"
+  def tagname(self): 
+    return "\n[" + self.__class__.__name__ + "]\n"
 
-    def __repr__(self):
-        return self.tagname() + repr(self.tag)
+  def __repr__(self): 
+    return self.tagname() + repr(self.tag)
 
-    def adoc(self):
-        # Produce Asciidoc output for this element
-        return repr(self.tag.get_text())
+  def adoc(self):
+    # Produce Asciidoc output for this element
+    return repr(self.tag.get_text())
 
 
 class Paragraph(BookElement):
-    matchStr = "MsoNormal"
+  matchStr = "MsoNormal"
 
-    def grabber(tag, bookBuilder):
-        if Paragraph.matchStr in tag['class']:
-            if len(tag.get_text().strip()):
-                bookBuilder.book.append(Paragraph(tag))
-            return True
-        return False
-    BookBuilder.grabbers.append(grabber)
-
-    def adoc(self):
-        return "- " + repr(self.tag.get_text())
+  def grabber(tag, bookBuilder):
+    if Paragraph.matchStr in tag['class']:
+      if len(tag.get_text().strip()):
+        bookBuilder.book.append(Paragraph(tag))
+      return True
+    return False
+  BookBuilder.grabbers.append(grabber)
+  
+  def adoc(self): 
+    return "- " + repr(self.tag.get_text())
 
 
 class Code(BookElement):
-    matchStr = "Code"
+  matchStr = "Code"
 
-    @staticmethod
-    def testForCodeNumber(tag):
-        return  type(tag) is bs4.element.Tag and \
+  @staticmethod
+  def testForCodeNumber(tag):
+    return  type(tag) is bs4.element.Tag and \
             tag.name == "span" and \
-            "class" in tag and \
+            tag.has_key("class") and \
             "CodeNumber" in tag["class"]
 
-    def grabber(tag, bookBuilder):
-        if Code.matchStr in tag['class']:
-            if any(map(Code.testForCodeNumber, tag)):
-                bookBuilder.book.append(Example(tag))
-                bookBuilder.grabbers.insert(0, Example.grabber)
-            else:
-                bookBuilder.book.append(CodeFragment(tag))
-                bookBuilder.grabbers.insert(0, CodeFragment.grabber)
-            return True
-        return False
-    BookBuilder.grabbers.append(grabber)
+  def grabber(tag, bookBuilder):
+    if Code.matchStr in tag['class']:
+      if any(map(Code.testForCodeNumber, tag)):
+        bookBuilder.book.append(Example(tag))
+        bookBuilder.grabbers.insert(0, Example.grabber)
+      else:
+        bookBuilder.book.append(CodeFragment(tag))
+        bookBuilder.grabbers.insert(0, CodeFragment.grabber)
+      return True
+    return False
+  BookBuilder.grabbers.append(grabber)
 
 
 class Example(BookElement):
-    """
-    Single contiguous block of code, appears as line-numbered example in the book.
-    Stored without line numbers.
-    """
-    ltrim = 6
+  """
+  Single contiguous block of code, appears as line-numbered example in the book.
+  Stored without line numbers.
+  """
+  ltrim = 6
+  def __init__(self, tag):
+    super(Example,self).__init__(tag)
+    self.lines = [tag]
+    self.finished = ""
 
-    def __init__(self, tag):
-        super(Example, self).__init__(tag)
-        self.lines = [tag]
-        self.finished = ""
+  @staticmethod
+  def grabber(tag, bookBuilder):
+    if Code.matchStr in tag['class']:
+      if any(map(Code.testForCodeNumber, tag)):
+        bookBuilder.book[-1].lines.append(tag)
+      return True
+    else:
+      bookBuilder.grabbers.pop(0) # Remove the grabber
+      return False
 
-    @staticmethod
-    def grabber(tag, bookBuilder):
-        if Code.matchStr in tag['class']:
-            if any(map(Code.testForCodeNumber, tag)):
-                bookBuilder.book[-1].lines.append(tag)
-            return True
-        else:
-            bookBuilder.grabbers.pop(0)  # Remove the grabber
-            return False
+  def finish(self, ltrim = 6):
+    if self.finished: return self.finished
+    result = ""
+    for ln in self.lines:
+      cleanedLine = clean(ln.get_text())
+      cleanedLine = cleanedLine[self.__class__.ltrim:]
+      result += cleanedLine + "\n"
+    self.finished = result.rstrip()
+    return self.finished
 
-    def finish(self, ltrim=6):
-        if self.finished:
-            return self.finished
-        result = ""
-        for ln in self.lines:
-            cleanedLine = clean(ln.get_text())
-            cleanedLine = cleanedLine[self.__class__.ltrim:]
-            result += cleanedLine + "\n"
-        self.finished = result.rstrip()
-        return self.finished
+  def __repr__(self):
+    return self.tagname() + self.finish()
 
-    def __repr__(self):
-        return self.tagname() + self.finish()
-
-    def adoc(self):
-        return """[source,scala]
+  def adoc(self):
+    return """[source,scala]
 --------------------------------------""" + \
-            self.finish() + \
-            "--------------------------------------"
+    self.finish() + \
+    "--------------------------------------"
 
 
 class CodeFragment(Example):
-    """
-    Un-numbered text that appears in code font in the book,
-    as a standalone paragraph.
-    """
-    ltrim = 2
+  """
+  Un-numbered text that appears in code font in the book, 
+  as a standalone paragraph.
+  """
+  ltrim = 2
 
-    @staticmethod
-    def grabber(tag, bookBuilder):
-        if Code.matchStr in tag['class']:
-            if not any(map(Code.testForCodeNumber, tag)):
-                bookBuilder.book[-1].lines.append(tag)
-            return True
-        else:
-            bookBuilder.grabbers.pop(0)  # Remove the grabber
-            return False
+  @staticmethod
+  def grabber(tag, bookBuilder):
+    if Code.matchStr in tag['class']:
+      if not any(map(Code.testForCodeNumber, tag)):
+        bookBuilder.book[-1].lines.append(tag)
+      return True
+    else:
+      bookBuilder.grabbers.pop(0) # Remove the grabber
+      return False
 
-    def adoc(self):
-        return "*+" + "\n".join(self.finish()) + "+*"
+  def adoc(self):
+    return "*+" + "\n".join(self.finish()) + "+*"
 
 
 class NumberedList(BookElement):
-    matchStr = "MsoListParagraphCxSpFirst"
+  matchStr = "MsoListParagraphCxSpFirst"
+  def __init__(self, tag):
+    super(NumberedList,self).__init__(tag)
+    self.items = [tag]
+    self.finished = ""
 
-    def __init__(self, tag):
-        super(NumberedList, self).__init__(tag)
-        self.items = [tag]
-        self.finished = ""
+  def grabber(tag, bookBuilder):
+    if NumberedList.matchStr in tag['class']:
+      bookBuilder.book.append(NumberedList(tag))
+      bookBuilder.grabbers.insert(0, NumberedList.subsequentGrabber)
+      return True
+    return False
+  BookBuilder.grabbers.append(grabber)
 
-    def grabber(tag, bookBuilder):
-        if NumberedList.matchStr in tag['class']:
-            bookBuilder.book.append(NumberedList(tag))
-            bookBuilder.grabbers.insert(0, NumberedList.subsequentGrabber)
-            return True
-        return False
-    BookBuilder.grabbers.append(grabber)
+  @staticmethod
+  def subsequentGrabber(tag, bookBuilder):
+    bookBuilder.book[-1].items.append(tag)
+    if "MsoListParagraphCxSpMiddle" in tag['class']:
+      return True
+    if "MsoListParagraphCxSpLast" in tag['class']:
+      bookBuilder.grabbers.pop(0) # Remove the subsequentGrabber
+      return True
+    assert False, "bullet points out of synch"
 
-    @staticmethod
-    def subsequentGrabber(tag, bookBuilder):
-        bookBuilder.book[-1].items.append(tag)
-        if "MsoListParagraphCxSpMiddle" in tag['class']:
-            return True
-        if "MsoListParagraphCxSpLast" in tag['class']:
-            bookBuilder.grabbers.pop(0)  # Remove the subsequentGrabber
-            return True
-        assert False, "bullet points out of synch"
+  def finish(self, ltrim = 6):
+    if self.finished: return self.finished
+    result = ""
+    for ln in self.items:
+      cleanedLine = clean(ln.get_text())
+      cleanedLine = cleanedLine[ltrim:]
+      result += ". " + cleanedLine.strip() + "\n"
+    self.finished = result.rstrip()
+    return self.finished
 
-    def finish(self, ltrim=6):
-        if self.finished:
-            return self.finished
-        result = ""
-        for ln in self.items:
-            cleanedLine = clean(ln.get_text())
-            cleanedLine = cleanedLine[ltrim:]
-            result += ". " + cleanedLine.strip() + "\n"
-        self.finished = result.rstrip()
-        return self.finished
+  def __repr__(self):
+    return self.tagname() + self.finish()
 
-    def __repr__(self):
-        return self.tagname() + self.finish()
-
-    def adoc(self):
-        return self.finish()
+  def adoc(self):
+    return self.finish()
 
 
 class ExerciseHeader(BookElement):
-    matchStr = "Exercises"
-
-    def __init__(self):
-        super(ExerciseHeader, self).__init__(">>>>> Exercises <<<<<<<<")
-
-    def __repr__(self):
-        return "\n[>>>>> Exercises <<<<<<<<]"
+  matchStr = "Exercises"
+  def __init__(self):
+    super(ExerciseHeader,self).__init__(">>>>> Exercises <<<<<<<<")
+  def __repr__(self): return "\n[>>>>> Exercises <<<<<<<<]"
 
 
-class NotTag(BookElement):
-    pass
-
-
-class Heading2(BookElement):
-    pass
-
-
-class Heading3(BookElement):
-    pass
+class NotTag(BookElement): pass
+class Heading2(BookElement): pass
+class Heading3(BookElement): pass
 
 
 def addGrabber(BookElementClass):
-    # Class decorator to automatically add grabber to builder
-    def grabber(tag, bookBuilder):
-        if BookElementClass.matchStr in tag['class']:
-            bookBuilder.book.append(BookElementClass(tag))
-            return True
-        return False
-    BookBuilder.grabbers.append(grabber)
-    return BookElementClass
-
+  # Class decorator to automatically add grabber to builder
+  def grabber(tag, bookBuilder):
+    if BookElementClass.matchStr in tag['class']:
+      bookBuilder.book.append(BookElementClass(tag))
+      return True
+    return False
+  BookBuilder.grabbers.append(grabber)
+  return BookElementClass
 
 @addGrabber
 class Exercise(BookElement):
-    matchStr = "Exercise"
-
+  matchStr = "Exercise"
 
 @addGrabber
 class Quote(BookElement):
-    matchStr = "MsoQuote"
-
+  matchStr = "MsoQuote"
 
 @addGrabber
 class SolnsLink(BookElement):
-    matchStr = "SolnsLink"
-
+  matchStr = "SolnsLink"
 
 @addGrabber
-class Bullet(BookElement):  # Make this work like NumberedList
-    matchStr = "Bulleted"
-
-    def adoc(self):
-        return "  * " + repr(self.tag.get_text())
+class Bullet(BookElement): # Make this work like NumberedList
+  matchStr = "Bulleted"
+  def adoc(self): 
+    return "  * " + repr(self.tag.get_text())
 
 
 ####### End of BookElements ###################
@@ -284,85 +255,77 @@ class Bullet(BookElement):  # Make this work like NumberedList
 
 class Chapter(object):
 
-    def __init__(self, name, rawData):
-        self.name = name
-        # rawData = UnicodeDammit.detwingle(rawData).decode("utf8")
-        self.soup = BeautifulSoup(rawData, from_encoding="windows-1252")
-        self.elements = BookBuilder(self.soup).book
+  def __init__(self, name, rawData):
+    self.name = name
+    # rawData = UnicodeDammit.detwingle(rawData).decode("utf8")
+    self.soup = BeautifulSoup(rawData, from_encoding="windows-1252")
+    self.elements = BookBuilder(self.soup).book
 
-    @staticmethod
-    def chapterize(bookSource):
-        """
-        Break book into Chapter objects, return ordered dictionary
-        of Chapters, keyed by chapter name
-        """
-        # Cleanup:
-        bookSource = bookSource.replace(
-            "<br>", "<br/>").replace("</br>", "<br/>")
-        bookSource = bookSource.replace("<p class=MsoNormal>&nbsp;</p>\n", "")
-        # print >>file("Cleaned.txt", "w"), bookSource
-        # Split into chapter titles and contents:
-        pieces = re.split("<h1>(.*?)</h1>", bookSource, flags=re.DOTALL)
-        odict = collections.OrderedDict()
-        odict[u"Front Matter"] = Chapter(u"Front Matter", pieces[0])
-        del pieces[0]  # Remove material up to first <h1>
+  @staticmethod
+  def chapterize(bookSource):
+    """
+    Break book into Chapter objects, return ordered dictionary
+    of Chapters, keyed by chapter name
+    """
+    # Cleanup:
+    bookSource = bookSource.replace("<br>", "<br/>").replace("</br>", "<br/>")
+    bookSource = bookSource.replace("<p class=MsoNormal>&nbsp;</p>\n", "")
+    # print >>file("Cleaned.txt", "w"), bookSource
+    # Split into chapter titles and contents:
+    pieces = re.split("<h1>(.*?)</h1>", bookSource, flags=re.DOTALL)
+    odict = collections.OrderedDict()
+    odict[u"Front Matter"] = Chapter(u"Front Matter", pieces[0])
+    del pieces[0] # Remove material up to first <h1>
+    def chapterName(glop):
+      name = BeautifulSoup(glop, from_encoding="windows-1252").get_text().strip()
+      name = filter(lambda x: x in string.printable, name)
+      name = " ".join(map(string.strip, name.split()))
+      return name
+    odict.update([(name, Chapter(name, rawData)) 
+      for name, rawData in zip(map(chapterName, pieces[::2]), pieces[1::2])])
+    return odict
 
-        def chapterName(glop):
-            name = BeautifulSoup(
-                glop, from_encoding="windows-1252").get_text().strip()
-            name = filter(lambda x: x in string.printable, name)
-            name = " ".join(map(string.strip, name.split()))
-            return name
-        odict.update([(name, Chapter(name, rawData))
-                      for name, rawData in 
-                      zip(map(chapterName, pieces[::2]), pieces[1::2])])
-        return odict
+  def __repr__(self): return self.name
 
-    def __repr__(self):
-        return self.name
-
-    def header(self):
-        return "\n" + "=" * 40 + "\n" + self.name + "\n" + "=" * 40
+  def header(self):
+    return "\n" + "=" * 40 + "\n" + self.name + "\n" + "=" * 40
 
 
 def seminarSubset(chapters):
-    summarized = collections.OrderedDict(chapters)
-    for cn in summarized.keys():
-        if cn == "Summary 1":
-            break
-        del summarized[cn]
-    for cn in summarized.keys()[1:]:
-        if cn == "Summary 2":
-            break
-        del summarized[cn]
-    for cn in reversed(summarized.keys()):
-        if cn == "Appendix B: Calling Scala from Java":
-            break
-        del summarized[cn]
-    return summarized
+  summarized = collections.OrderedDict(chapters)
+  for cn in summarized.keys():
+    if cn == "Summary 1": break
+    del summarized[cn]
+  for cn in summarized.keys()[1:]:
+    if cn == "Summary 2": break
+    del summarized[cn]
+  for cn in reversed(summarized.keys()):
+    if cn == "Appendix B: Calling Scala from Java": break
+    del summarized[cn]
+  return summarized  
 
 
 if __name__ == "__main__":
-    chapters = Chapter.chapterize(open("AtomicScalaCleaned.html", "rU").read())
-    # test = chapters["Comprehensions"]
-    # test = chapters["Functions as Objects"]
-    # print test.header()
-    # pprint(test.elements, trace)
-    summarized = seminarSubset(chapters)
-    for chap in summarized.values():
-        print chap.header()
-        for el in chap.elements:
-            print el
-            # if type(el) is Example or type(el) is CodeFragment:
-            #   print el
-    # print test.elements[25]
-    # trace2 = file("_OutputTrace2.txt", "w")
-    # for e in test.soup:
-    #   print >>trace2, e
-    # test.trace(file("_OutputTrace3.txt", "w"))
-    # pprint(test.elements, file("Elements.txt", "w"))
+  chapters = Chapter.chapterize(open("AtomicScalaCleaned.html", "rU").read())
+  # test = chapters["Comprehensions"]
+  # test = chapters["Functions as Objects"]
+  # print test.header()
+  # pprint(test.elements, trace)
+  summarized = seminarSubset(chapters)
+  for chap in summarized.values():
+    print chap.header()
+    for el in chap.elements:
+      print el
+      # if type(el) is Example or type(el) is CodeFragment:
+      #   print el
+  #print test.elements[25]
+  # trace2 = file("_OutputTrace2.txt", "w")
+  # for e in test.soup:
+  #   print >>trace2, e
+  # test.trace(file("_OutputTrace3.txt", "w"))
+  # pprint(test.elements, file("Elements.txt", "w"))
 
-
+  
 # def selectCode(cand):
 #   return (type(cand) is bs4.element.Tag and
 #     cand.has_key("class") and
@@ -392,5 +355,5 @@ if __name__ == "__main__":
 
 #     self.codes = list(itertools.ifilter(selectCode, self.soup.contents))
 
-#   def __repr__(self):
+#   def __repr__(self): 
 #     return repr(self.description) + repr(self.codes)
