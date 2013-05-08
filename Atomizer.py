@@ -34,7 +34,6 @@ class BookBuilder(object):
   def transform(self, tag):
     if type(tag) is bs4.element.NavigableString:
       if tag.string == u'\n': return
-      return self.book.append(NavigableString(tag))
     if type(tag) is bs4.element.Tag:
       if tag.string == u'\n': return
       if tag.name == "h2":
@@ -52,24 +51,17 @@ class BookBuilder(object):
 
 ############ BookElements ####################################
 
-
-def addGrabber(BookElementClass):
-  # Class decorator to automatically add grabber to builder
-  def grabber(tag, bookBuilder):
-    if BookElementClass.matchStr in tag['class']:
-      bookBuilder.book.append(BookElementClass(tag))
-      return True
-    return False
-  bookElementGrabbers.append(grabber)
-  return BookElementClass
-
 class BookElement(object):
   matchStr = "Non Matching"
+
   def __init__(self, tag): self.tag = tag
+
   def tagname(self): 
     return "\n[" + self.__class__.__name__ + "]\n"
+
   def __repr__(self): 
     return self.tagname() + repr(self.tag)
+
   def adoc(self):
     # Produce Asciidoc output for this element
     return repr(self.tag.get_text())
@@ -77,6 +69,7 @@ class BookElement(object):
 
 class Paragraph(BookElement):
   matchStr = "MsoNormal"
+
   def grabber(tag, bookBuilder):
     if Paragraph.matchStr in tag['class']:
       if len(tag.get_text().strip()):
@@ -84,6 +77,7 @@ class Paragraph(BookElement):
       return True
     return False
   bookElementGrabbers.append(grabber)
+  
   def adoc(self): 
     return "- " + repr(self.tag.get_text())
 
@@ -173,35 +167,6 @@ class CodeFragment(Example):
     return "*+" + "\n".join(self.finish()) + "+*"
 
 
-class ExerciseHeader(BookElement):
-  matchStr = "Exercises"
-  def __init__(self):
-    super(ExerciseHeader,self).__init__(">>>>> Exercises <<<<<<<<")
-  def __repr__(self): return "\n[>>>>> Exercises <<<<<<<<]"
-
-@addGrabber
-class Exercise(BookElement):
-  matchStr = "Exercise"
-
-@addGrabber
-class Quote(BookElement):
-  matchStr = "MsoQuote"
-
-class NavigableString(BookElement): pass
-class NotTag(BookElement): pass
-class Heading2(BookElement): pass
-class Heading3(BookElement): pass
-
-@addGrabber
-class SolnsLink(BookElement):
-  matchStr = "SolnsLink"
-
-@addGrabber
-class Bullet(BookElement): # Make this work like NumberedList
-  matchStr = "Bulleted"
-  def adoc(self): 
-    return "  * " + repr(self.tag.get_text())
-
 class NumberedList(BookElement):
   matchStr = "MsoListParagraphCxSpFirst"
   def __init__(self, tag):
@@ -242,6 +207,47 @@ class NumberedList(BookElement):
 
   def adoc(self):
     return self.finish()
+
+
+class ExerciseHeader(BookElement):
+  matchStr = "Exercises"
+  def __init__(self):
+    super(ExerciseHeader,self).__init__(">>>>> Exercises <<<<<<<<")
+  def __repr__(self): return "\n[>>>>> Exercises <<<<<<<<]"
+
+
+class NotTag(BookElement): pass
+class Heading2(BookElement): pass
+class Heading3(BookElement): pass
+
+
+def addGrabber(BookElementClass):
+  # Class decorator to automatically add grabber to builder
+  def grabber(tag, bookBuilder):
+    if BookElementClass.matchStr in tag['class']:
+      bookBuilder.book.append(BookElementClass(tag))
+      return True
+    return False
+  bookElementGrabbers.append(grabber)
+  return BookElementClass
+
+@addGrabber
+class Exercise(BookElement):
+  matchStr = "Exercise"
+
+@addGrabber
+class Quote(BookElement):
+  matchStr = "MsoQuote"
+
+@addGrabber
+class SolnsLink(BookElement):
+  matchStr = "SolnsLink"
+
+@addGrabber
+class Bullet(BookElement): # Make this work like NumberedList
+  matchStr = "Bulleted"
+  def adoc(self): 
+    return "  * " + repr(self.tag.get_text())
 
 
 ####### End of BookElements ###################
