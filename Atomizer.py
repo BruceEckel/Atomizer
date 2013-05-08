@@ -90,6 +90,7 @@ class Paragraph(BookElement):
 
 class Code(BookElement):
   matchStr = "Code"
+
   @staticmethod
   def testForCodeNumber(tag):
     return  type(tag) is bs4.element.Tag and \
@@ -104,10 +105,11 @@ class Code(BookElement):
         bookBuilder.grabbers.insert(0, Example.grabber)
       else:
         bookBuilder.book.append(CodeFragment(tag))
-        bookBuilder.grabbers.insert(0, codeFragmentGrabber)
+        bookBuilder.grabbers.insert(0, CodeFragment.grabber)
       return True
     return False
   bookElementGrabbers.append(grabber)
+
 
 class Example(BookElement):
   """
@@ -149,14 +151,6 @@ class Example(BookElement):
     self.finish() + \
     "--------------------------------------"
 
-def codeFragmentGrabber(tag, bookBuilder):
-  if Code.matchStr in tag['class']:
-    if not any(map(Code.testForCodeNumber, tag)):
-      bookBuilder.book[-1].lines.append(tag)
-    return True
-  else:
-    bookBuilder.grabbers.pop(0) # Remove the codeFragmentGrabber
-    return False
 
 class CodeFragment(Example):
   """
@@ -164,8 +158,20 @@ class CodeFragment(Example):
   as a standalone paragraph.
   """
   ltrim = 2
+
+  @staticmethod
+  def grabber(tag, bookBuilder):
+    if Code.matchStr in tag['class']:
+      if not any(map(Code.testForCodeNumber, tag)):
+        bookBuilder.book[-1].lines.append(tag)
+      return True
+    else:
+      bookBuilder.grabbers.pop(0) # Remove the grabber
+      return False
+
   def adoc(self):
     return "*+" + "\n".join(self.finish()) + "+*"
+
 
 class ExerciseHeader(BookElement):
   matchStr = "Exercises"
@@ -191,7 +197,7 @@ class SolnsLink(BookElement):
   matchStr = "SolnsLink"
 
 @addGrabber
-class Bullet(BookElement):
+class Bullet(BookElement): # Make this work like NumberedList
   matchStr = "Bulleted"
   def adoc(self): 
     return "  * " + repr(self.tag.get_text())
