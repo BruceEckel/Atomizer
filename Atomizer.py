@@ -74,6 +74,7 @@ class BookElement(object):
     # Produce Asciidoc output for this element
     return repr(self.tag.get_text())
 
+
 class Paragraph(BookElement):
   matchStr = "MsoNormal"
   def grabber(tag, bookBuilder):
@@ -87,19 +88,20 @@ class Paragraph(BookElement):
     return "- " + repr(self.tag.get_text())
 
 
-def testForCodeNumber(tag):
-  return  type(tag) is bs4.element.Tag and \
-          tag.name == "span" and \
-          tag.has_key("class") and \
-          "CodeNumber" in tag["class"]
-
 class Code(BookElement):
   matchStr = "Code"
+  @staticmethod
+  def testForCodeNumber(tag):
+    return  type(tag) is bs4.element.Tag and \
+            tag.name == "span" and \
+            tag.has_key("class") and \
+            "CodeNumber" in tag["class"]
+
   def grabber(tag, bookBuilder):
     if Code.matchStr in tag['class']:
-      if any(map(testForCodeNumber, tag)):
+      if any(map(Code.testForCodeNumber, tag)):
         bookBuilder.book.append(Example(tag))
-        bookBuilder.grabbers.insert(0, exampleGrabber)
+        bookBuilder.grabbers.insert(0, Example.grabber)
       else:
         bookBuilder.book.append(CodeFragment(tag))
         bookBuilder.grabbers.insert(0, codeFragmentGrabber)
@@ -107,25 +109,26 @@ class Code(BookElement):
     return False
   bookElementGrabbers.append(grabber)
 
-def exampleGrabber(tag, bookBuilder):
-  if Code.matchStr in tag['class']:
-    if any(map(testForCodeNumber, tag)):
-      bookBuilder.book[-1].lines.append(tag)
-    return True
-  else:
-    bookBuilder.grabbers.pop(0) # Remove the exampleGrabber
-    return False
-
 class Example(BookElement):
   """
-  Single contiguous block of code, appears a line-numbered example in the book.
-  Stored without line numbers, xxx method will output with line numbers.
+  Single contiguous block of code, appears as line-numbered example in the book.
+  Stored without line numbers.
   """
   ltrim = 6
   def __init__(self, tag):
     super(Example,self).__init__(tag)
     self.lines = [tag]
     self.finished = ""
+
+  @staticmethod
+  def grabber(tag, bookBuilder):
+    if Code.matchStr in tag['class']:
+      if any(map(Code.testForCodeNumber, tag)):
+        bookBuilder.book[-1].lines.append(tag)
+      return True
+    else:
+      bookBuilder.grabbers.pop(0) # Remove the grabber
+      return False
 
   def finish(self, ltrim = 6):
     if self.finished: return self.finished
@@ -148,7 +151,7 @@ class Example(BookElement):
 
 def codeFragmentGrabber(tag, bookBuilder):
   if Code.matchStr in tag['class']:
-    if not any(map(testForCodeNumber, tag)):
+    if not any(map(Code.testForCodeNumber, tag)):
       bookBuilder.book[-1].lines.append(tag)
     return True
   else:
