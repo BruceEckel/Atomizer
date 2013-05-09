@@ -3,7 +3,7 @@ Atomizer
 
 Python/BeautifulSoup extracts data from Word 2010 filtered HTML. Custom application, not a general tool.
 
-This is a tool created for the Atomic Python book, to automatically create a starting point for the seminar
+This is a tool created for the `Atomic Scala <http://www.AtomicScala.com>`_ book, to automatically create a starting point for the seminar
 presentation material. It outputs Asciidoc Slidy format.
 
 I'm just storing this here as an experiment, and in case anyone gets some benefit from the code.
