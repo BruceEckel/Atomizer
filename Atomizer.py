@@ -247,17 +247,23 @@ def addGrabber(BookElementClass):
 @addGrabber
 class Bullet(BookElement): # Don't need to make this work like NumberedList
     matchStr = "Bulleted"
+
     def adoc(self):
         return "  * " + Paragraph.clean(repr(self.tag.get_text())) + "\n"
 
+
 class Exercise(BookElement):
     matchStr = "Exercise"
+
     def grabber(tag, bookBuilder):
         if Exercise.matchStr in tag['class']:
             bookBuilder.book.append(Exercise(tag))
             return True
         return False
     BookBuilder.grabbers.append(grabber)
+
+    def adoc(self):
+        return Paragraph.clean(repr(self.tag.get_text())) + "\n"    
 
 @addGrabber
 class Quote(BookElement):
