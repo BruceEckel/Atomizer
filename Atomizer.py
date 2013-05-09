@@ -164,7 +164,7 @@ class CodeFragment(Example):
             return False
 
     def adoc(self):
-        return "*+" + "\n".join(self.finish()) + "+*"
+        return "*+" + self.finish() + "+*"
 
 
 class NumberedList(BookElement):
@@ -320,6 +320,7 @@ def buildSeminar(chapters):
         with file(fname, "w") as chapSlides:
             print >>chapSlides, slideHeader % name
             for el in chap.elements:
+                print >>chapSlides, el # Test to see where it breaks
                 print >>chapSlides, el.adoc()
 
 
