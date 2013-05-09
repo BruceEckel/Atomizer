@@ -80,6 +80,7 @@ class Paragraph(BookElement):
         s = s.replace("\u2019", "\x92") # Right single quote
         s = s.replace("\u2013", "\x97") # Em-dash
         s = s.replace("\u2026", "\x85") # Ellipse
+        s = s.replace(r"\'", "'") # Ellipse
         s = " ".join(s.split()) # remove multiple spaces
         return s
 
@@ -202,14 +203,14 @@ class NumberedList(BookElement):
             return True
         assert False, "bullet points out of synch"
 
-    def finish(self, ltrim = 6):
+    def finish(self, ltrim = 3):
         if self.finished: return self.finished
         result = ""
         for ln in self.items:
-            cleanedLine = clean(ln.get_text())
+            cleanedLine = Paragraph.clean(repr(ln.get_text()))
             cleanedLine = cleanedLine[ltrim:]
-            result += ". " + cleanedLine.strip() + "\n"
-        self.finished = result.rstrip()
+            result += ". " + cleanedLine.strip() + "\n\n"
+        self.finished = result
         return self.finished
 
     def __repr__(self):
