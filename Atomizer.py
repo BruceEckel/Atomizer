@@ -141,9 +141,9 @@ class Example(BookElement):
 
     def adoc(self):
         return "[source,scala]\n" + \
-        "--------------------------------------" + \
+        "--------------------------------------\n" + \
         self.finish() + \
-        "--------------------------------------"
+        "\n--------------------------------------"
 
 
 class CodeFragment(Example):
@@ -214,6 +214,8 @@ class ExerciseHeader(BookElement):
     def __init__(self):
         super(ExerciseHeader,self).__init__(">>>>> Exercises <<<<<<<<")
     def __repr__(self): return "\n[>>>>> Exercises <<<<<<<<]"
+    def adoc(self):
+        return "Exercises\n---------" 
 
 
 class NotTag(BookElement): pass
@@ -316,7 +318,10 @@ def buildSeminar(chapters):
     if not os.path.exists("slides"):
         os.mkdir("slides")
     for n, (name, chap) in enumerate(chapters.items()):
-        fname = os.path.join("slides", "%02d-%s" % (n, "".join(name.split())))
+        basename = "%02d-%s" % (n, "".join(name.split()))
+        basename = basename.split(':')[0].replace('&', 'And')
+        fname = os.path.join("slides", "%s.slidy" % basename)
+        print fname
         with file(fname, "w") as chapSlides:
             print >>chapSlides, slideHeader % name
             for el in chap.elements:
