@@ -6,9 +6,8 @@ of book into AsciiDoc format for rapid creation of seminar slides.
 Uses "Builder" design pattern, also chain of responsibility
 TODO: generate example output files, compile as test
 """
-import re, glob, string, itertools, collections, bs4, os, os.path
-from bs4 import BeautifulSoup, UnicodeDammit
-from pprint import pprint, pformat
+import re, string, collections, bs4, os, os.path
+from bs4 import BeautifulSoup
 import sys
 sys.stdout = file("OutputTrace.txt", 'w')
 
@@ -64,11 +63,25 @@ class BookElement(object):
 
     def adoc(self):
         # Produce Asciidoc output for this element
-        return repr(self.tag.get_text())
+        return "- " + Paragraph.clean(repr(self.tag.get_text())) + "\n"    
 
 
 class Paragraph(BookElement):
     matchStr = "MsoNormal"
+
+    @staticmethod
+    def clean(s):
+        s = s[2:][:-1]
+        s = s.replace(r"\xa0", " ")
+        s = s.replace(r"\n", " ")
+        s = s.replace("\u201c", "\x93") # Left double quote
+        s = s.replace("\u201d", "\x94") # Right double quote
+        s = s.replace("\u2018", "\x91") # Left single quote
+        s = s.replace("\u2019", "\x92") # Right single quote
+        s = s.replace("\u2013", "\x97") # Em-dash
+        s = s.replace("\u2026", "\x85") # Ellipse
+        s = " ".join(s.split()) # remove multiple spaces
+        return s
 
     def grabber(tag, bookBuilder):
         if Paragraph.matchStr in tag['class']:
@@ -77,9 +90,6 @@ class Paragraph(BookElement):
             return True
         return False
     BookBuilder.grabbers.append(grabber)
-
-    def adoc(self):
-        return "- " + repr(self.tag.get_text())
 
 
 class Code(BookElement):
@@ -143,7 +153,7 @@ class Example(BookElement):
         return "[source,scala]\n" + \
         "--------------------------------------\n" + \
         self.finish() + \
-        "\n--------------------------------------"
+        "\n--------------------------------------\n"
 
 
 class CodeFragment(Example):
@@ -164,7 +174,7 @@ class CodeFragment(Example):
             return False
 
     def adoc(self):
-        return "*+" + self.finish() + "+*"
+        return "*+" + self.finish() + "+*\n"
 
 
 class NumberedList(BookElement):
@@ -215,7 +225,7 @@ class ExerciseHeader(BookElement):
         super(ExerciseHeader,self).__init__(">>>>> Exercises <<<<<<<<")
     def __repr__(self): return "\n[>>>>> Exercises <<<<<<<<]"
     def adoc(self):
-        return "Exercises\n---------" 
+        return "Exercises\n---------\n" 
 
 
 class NotTag(BookElement): pass
@@ -237,11 +247,16 @@ def addGrabber(BookElementClass):
 class Bullet(BookElement): # Don't need to make this work like NumberedList
     matchStr = "Bulleted"
     def adoc(self):
-        return "  * " + repr(self.tag.get_text())
+        return "  * " + Paragraph.clean(repr(self.tag.get_text())) + "\n"
 
-@addGrabber
 class Exercise(BookElement):
     matchStr = "Exercise"
+    def grabber(tag, bookBuilder):
+        if Exercise.matchStr in tag['class']:
+            bookBuilder.book.append(Exercise(tag))
+            return True
+        return False
+    BookBuilder.grabbers.append(grabber)
 
 @addGrabber
 class Quote(BookElement):
@@ -304,8 +319,9 @@ def seminarSubset(chapters):
         del summarized[cn]
     return summarized
 
-slideHeader = """%s
-=================
+def slideChapterHeader(title):
+    return title + "\n" + '=' * len(title) + \
+"""
 :author:    Bruce Eckel, MindView LLC
 :backend:   slidy
 :max-width: 30em
@@ -321,12 +337,12 @@ def buildSeminar(chapters):
         basename = "%02d-%s" % (n, "".join(name.split()))
         basename = basename.split(':')[0].replace('&', 'And')
         fname = os.path.join("slides", "%s.slidy" % basename)
-        print fname
         with file(fname, "w") as chapSlides:
-            print >>chapSlides, slideHeader % name
+            print >>chapSlides, slideChapterHeader(name)
             for el in chap.elements:
-                print >>chapSlides, el # Test to see where it breaks
+                # print >>chapSlides, el # Test to see where it breaks
                 print >>chapSlides, el.adoc()
+                print el.adoc()
 
 
 if __name__ == "__main__":
