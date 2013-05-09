@@ -6,7 +6,7 @@ of book into AsciiDoc format for rapid creation of seminar slides.
 Uses "Builder" design pattern, also chain of responsibility
 TODO: generate example output files, compile as test
 """
-import re, glob, string, itertools, collections, bs4
+import re, glob, string, itertools, collections, bs4, os, os.path
 from bs4 import BeautifulSoup, UnicodeDammit
 from pprint import pprint, pformat
 import sys
@@ -140,8 +140,8 @@ class Example(BookElement):
         return self.tagname() + self.finish()
 
     def adoc(self):
-        return """[source,scala]
-    --------------------------------------""" + \
+        return "[source,scala]\n" + \
+        "--------------------------------------" + \
         self.finish() + \
         "--------------------------------------"
 
@@ -302,6 +302,26 @@ def seminarSubset(chapters):
         del summarized[cn]
     return summarized
 
+slideHeader = """%s
+=================
+:author:    Bruce Eckel, MindView LLC
+:backend:   slidy
+:max-width: 30em
+:data-uri:
+:source-highlighter: pygments
+:icons:
+"""
+
+def buildSeminar(chapters):
+    if not os.path.exists("slides"):
+        os.mkdir("slides")
+    for n, (name, chap) in enumerate(chapters.items()):
+        fname = os.path.join("slides", "%02d-%s" % (n, "".join(name.split())))
+        with file(fname, "w") as chapSlides:
+            print >>chapSlides, slideHeader % name
+            for el in chap.elements:
+                print >>chapSlides, el.adoc()
+
 
 if __name__ == "__main__":
     chapters = Chapter.chapterize(open("AtomicScalaCleaned.html", "rU").read())
@@ -310,10 +330,11 @@ if __name__ == "__main__":
     # print test.header()
     # pprint(test.elements, trace)
     summarized = seminarSubset(chapters)
-    for chap in summarized.values():
-        print chap.header()
-        for el in chap.elements:
-            print el
+    buildSeminar(summarized)
+    # for chap in summarized.values():
+    #     print chap.header()
+    #     for el in chap.elements:
+    #         print el
             # if type(el) is Example or type(el) is CodeFragment:
             #   print el
     #print test.elements[25]
