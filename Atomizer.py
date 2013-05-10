@@ -70,7 +70,22 @@ class Paragraph(BookElement):
     matchStr = "MsoNormal"
 
     @staticmethod
-    def clean(s):
+    def clean(s): # Outputs asciidoc markup
+        s = s[2:][:-1]
+        s = s.replace(r"\xa0", " ")
+        s = s.replace(r"\n", " ")
+        s = s.replace("\u201c", "``") # Left double quote
+        s = s.replace("\u201d", "''") # Right double quote
+        s = s.replace("\u2018", "`") # Left single quote
+        s = s.replace("\u2019", "'") # Right single quote
+        s = s.replace("\u2013", "&#151;") # Em-dash
+        s = s.replace("\u2026", "...") # Ellipse
+        s = s.replace(r"\'", "'") # Ellipse
+        s = " ".join(s.split()) # remove multiple spaces
+        return s
+
+    @staticmethod
+    def cleanToWindows(s):
         s = s[2:][:-1]
         s = s.replace(r"\xa0", " ")
         s = s.replace(r"\n", " ")
