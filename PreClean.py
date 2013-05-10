@@ -1,7 +1,7 @@
 # -*- coding: windows-1252 -*-
 """
 Takes "Filtered HTML" output from Word 2010 and pre-cleans
-it to prepare for use by BookBuilder.py
+it to prepare for use by Atomizer.py
 """
 import re, glob, string, itertools, collections, bs4
 from bs4 import BeautifulSoup, UnicodeDammit

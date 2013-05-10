@@ -36,8 +36,6 @@ class BookBuilder(object):
         if type(tag) is bs4.element.Tag:
             if tag.string == u'\n': return
             if tag.name == "h2":
-                if tag.string == "Exercises":
-                    return self.book.append(ExerciseHeader())
                 return self.book.append(Heading2(tag))
             if tag.name == "h3":
                 return self.book.append(Heading3(tag))
@@ -137,6 +135,8 @@ class Example(BookElement):
     Stored without line numbers.
     """
     ltrim = 6
+    source = "[source,scala, numbered]"
+
     def __init__(self, tag):
         super(Example,self).__init__(tag)
         self.lines = [tag]
@@ -166,7 +166,7 @@ class Example(BookElement):
         return self.tagname() + self.finish()
 
     def adoc(self):
-        return "[source,scala]\n" + \
+        return self.__class__.source + "\n" + \
         "--------------------------------------\n" + \
         self.finish() + \
         "\n--------------------------------------\n"
@@ -178,6 +178,7 @@ class CodeFragment(Example):
     as a standalone paragraph.
     """
     ltrim = 2
+    source = "[source,scala]"
 
     @staticmethod
     def grabber(tag, bookBuilder):
@@ -188,9 +189,6 @@ class CodeFragment(Example):
         else:
             bookBuilder.grabbers.pop(0) # Remove the grabber
             return False
-
-    def adoc(self):
-        return "*+" + self.finish() + "+*\n"
 
 
 class NumberedList(BookElement):
@@ -235,18 +233,18 @@ class NumberedList(BookElement):
         return self.finish()
 
 
-class ExerciseHeader(BookElement):
-    matchStr = "Exercises"
-    def __init__(self):
-        super(ExerciseHeader,self).__init__(">>>>> Exercises <<<<<<<<")
-    def __repr__(self): return "\n[>>>>> Exercises <<<<<<<<]"
-    def adoc(self):
-        return "Exercises\n---------\n" 
-
-
 class NotTag(BookElement): pass
-class Heading2(BookElement): pass
-class Heading3(BookElement): pass
+
+
+class Heading2(BookElement):
+    sep = '-'
+    def adoc(self):
+        title = repr(self.tag.get_text())[2:][:-1]
+        return title + "\n" + self.__class__.sep * len(title) + "\n"
+
+
+class Heading3(Heading2):
+    sep = '~'
 
 
 def addGrabber(BookElementClass):
@@ -258,6 +256,7 @@ def addGrabber(BookElementClass):
         return False
     BookBuilder.grabbers.append(grabber)
     return BookElementClass
+
 
 @addGrabber
 class Bullet(BookElement): # Don't need to make this work like NumberedList
@@ -287,6 +286,7 @@ class Quote(BookElement):
 @addGrabber
 class SolnsLink(BookElement):
     matchStr = "SolnsLink"
+    def adoc(self): return ""
 
 
 ####### End of BookElements ###################
@@ -344,13 +344,21 @@ def seminarSubset(chapters):
 def slideChapterHeader(title):
     return title + "\n" + '=' * len(title) + \
 """
-:author:    Bruce Eckel, MindView LLC
+:author: From "Atomic Scala" +
+by Bruce Eckel & Dianne Marsh; +
+Not for distribution
+:copyright: 2013 MindView LLC
 :backend:   slidy
 :max-width: 30em
 :data-uri:
 :source-highlighter: pygments
 :icons:
+:description: 
+
+Introduction
+------------
 """
+
 
 def buildSeminar(chapters):
     if not os.path.exists("slides"):
