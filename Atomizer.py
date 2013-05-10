@@ -61,7 +61,8 @@ class BookElement(object):
 
     def adoc(self):
         # Produce Asciidoc output for this element
-        return "- " + Paragraph.clean(repr(self.tag.get_text())) + "\n"    
+        # return "- " + Paragraph.clean(repr(self.tag.get_text())) + "\n"    
+        return Paragraph.clean(repr(self.tag.get_text())) + "\n"    
 
 
 class Paragraph(BookElement):
@@ -345,7 +346,7 @@ def slideChapterHeader(title):
     return title + "\n" + '=' * len(title) + \
 """
 :author: From "Atomic Scala" +
-by Bruce Eckel & Dianne Marsh; +
+by Bruce Eckel & Dianne Marsh. (c)2013 Mindview LLC. +
 Not for distribution
 :copyright: 2013 MindView LLC
 :backend:   slidy
@@ -353,12 +354,19 @@ Not for distribution
 :data-uri:
 :source-highlighter: pygments
 :icons:
-:description: 
+:deckjs_theme: neon
+:deckjs_transition: fade
+:pygments:
+:pygments_style: friendly
+:scrollable:
 
-Introduction
-------------
-"""
-
+== %s
+""" % title
+# good with swiss: *borland, manni, perldoc, tango, autumn, bw
+# good with neon: monokai, manni, *perldoc, *default, *vs, *trac, 
+#                 *fruity, *autumn, emacs, **friendly, native
+# Introduction
+# ------------
 
 def buildSeminar(chapters):
     if not os.path.exists("slides"):
