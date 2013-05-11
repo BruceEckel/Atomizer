@@ -61,7 +61,6 @@ class BookElement(object):
 
     def adoc(self):
         # Produce Asciidoc output for this element
-        # return "- " + Paragraph.clean(repr(self.tag.get_text())) + "\n"    
         return Paragraph.clean(repr(self.tag.get_text())) + "\n"    
 
 
@@ -69,8 +68,8 @@ class Paragraph(BookElement):
     matchStr = "MsoNormal"
 
     @staticmethod
-    def clean(s): # Outputs asciidoc markup
-        s = s[2:][:-1]
+    def clean(s, ltrim=2, rtrim=1): # Outputs asciidoc markup
+        s = s[ltrim:][:-rtrim]
         s = s.replace(r"\xa0", " ")
         s = s.replace(r"\n", " ")
         s = s.replace("\u201c", "``") # Left double quote
@@ -100,11 +99,28 @@ class Paragraph(BookElement):
 
     def grabber(tag, bookBuilder):
         if Paragraph.matchStr in tag['class']:
-            if len(tag.get_text().strip()):
+            if len(tag.get_text().strip()): # No empty paragraphs
                 bookBuilder.book.append(Paragraph(tag))
             return True
         return False
     BookBuilder.grabbers.append(grabber)
+
+    def adoc(self):
+        result = []
+        for piece in self.tag:
+            if type(piece) is bs4.element.Tag:
+                if piece.name == "span" and piece.has_key("class") and \
+                    "XrefChar" in piece["class"]:
+                    piece = "[yellow]*" + piece.get_text() + "*"
+            r = repr(piece)
+            if r.startswith("u'"):
+                result.append(Paragraph.clean(r))
+            else:
+                if r.startswith("<i>"):
+                    result.append("'" + Paragraph.clean(r, 3, 4) + "'")
+                elif r.startswith("<b>"):
+                    result.append("`" + Paragraph.clean(r, 3, 4) + "`")
+        return " ".join(result).rstrip() + "\n"    
 
 
 class Code(BookElement):
@@ -378,8 +394,17 @@ def buildSeminar(chapters):
         with file(fname, "w") as chapSlides:
             print >>chapSlides, slideChapterHeader(name)
             for el in chap.elements:
-                # print >>chapSlides, el # Test to see where it breaks
-                print >>chapSlides, el.adoc()
+                # if type(el) is Paragraph:
+                #     print >>chapSlides, el
+                #     print >>chapSlides
+                    # print el
+                #     print
+                    # for x in el.tag:
+                    #     # print >>chapSlides, repr(x)
+                    #     # print >>chapSlides
+                    #     print repr(x)
+                    #     print
+                print >>chapSlides, el.adoc().replace(" ,", ",")
                 print el.adoc()
 
 
