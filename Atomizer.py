@@ -227,7 +227,7 @@ class Exercise(BookElement):
         if isinstance(exn, bs4.element.Tag):
           exn = exn.get_text()
         exerciseNumber = exn.split('.')[0] # Remove trailing period
-        result += exerciseNumber + ". "
+        result += exerciseNumber + ".:: "
         for element in self.tag.contents[1:]:
             print repr(element)
             print
@@ -427,18 +427,9 @@ def buildSeminar(chapters):
         with file(fname, "w") as chapSlides:
             print >>chapSlides, slideChapterHeader(name)
             for el in chap.elements:
-                # if type(el) is Exercise:
-                #     print >>chapSlides, el
-                #     print >>chapSlides
-                #     for piece in el.tag:
-                #         print >>chapSlides, repr(piece).replace("<br/>","")
-                #         print >>chapSlides
-                #     print el.adoc()
-                #     print
                 print >>chapSlides, el.adoc().replace(" ,", ",")
 
 
 if __name__ == "__main__":
     chapters = Chapter.chapterize(open("AtomicScalaCleaned.html", "rU").read())
-    summarized = seminarSubset(chapters)
-    buildSeminar(summarized)
+    buildSeminar(seminarSubset(chapters))
