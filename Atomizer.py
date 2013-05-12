@@ -208,6 +208,52 @@ class CodeFragment(Example):
             return False
 
 
+class Exercise(BookElement):
+    matchStr = "Exercise"
+
+    def grabber(tag, bookBuilder):
+        if Exercise.matchStr in tag['class']:
+            bookBuilder.book.append(Exercise(tag))
+            return True
+        return False
+    BookBuilder.grabbers.append(grabber)
+
+    def adoc(self):
+        result = ""
+        funkySpaces = self.tag.find("span", {"style":'font:7.0pt "Times New Roman"'})
+        if funkySpaces:
+            funkySpaces.replace_with(" ")
+        exn = self.tag.contents[0]
+        if isinstance(exn, bs4.element.Tag):
+          exn = exn.get_text()
+        exerciseNumber = exn.split('.')[0] # Remove trailing period
+        result += exerciseNumber + ". "
+        for element in self.tag.contents[1:]:
+            print repr(element)
+            print
+            if type(element) is bs4.element.NavigableString:
+                result += Paragraph.clean(repr(element))
+            elif type(element) is bs4.element.Tag:
+                if element.name == 'b':
+                    result += " `" + Paragraph.clean(repr(element.get_text())) + "` "
+                elif element.name == 'i':
+                    result += " '" + Paragraph.clean(repr(element.get_text())) + "' "
+                elif element.name == "span" and element.has_key("class"):
+                    if "CodeChar" in element["class"]:
+                        codeBlock = Paragraph.clean(repr(element.get_text())).replace("<br/>","")
+                        result += "\n[source,scala]\n" + \
+                            "--------------------------------------\n" + \
+                            repr(element.get_text())[2:][:-1].replace(r"\n", "\n").replace(r"\xa0", " ") + \
+                            "\n--------------------------------------\n"
+                    if "XrefChar" in element["class"]:
+                        result += " *" + Paragraph.clean(repr(element.get_text())) + "* "
+            else:
+                result += repr(element)
+        result = result.replace(" ,", ", ").replace(" .", ". ")
+        result = result.replace("( ", "(").replace(" )", ")")
+        return result
+
+
 class NumberedList(BookElement):
     matchStr = "MsoListParagraphCxSpFirst"
     def __init__(self, tag):
@@ -283,22 +329,10 @@ class Bullet(BookElement): # Don't need to make this work like NumberedList
         return "  * " + Paragraph.clean(repr(self.tag.get_text())) + "\n"
 
 
-class Exercise(BookElement):
-    matchStr = "Exercise"
-
-    def grabber(tag, bookBuilder):
-        if Exercise.matchStr in tag['class']:
-            bookBuilder.book.append(Exercise(tag))
-            return True
-        return False
-    BookBuilder.grabbers.append(grabber)
-
-    def adoc(self):
-        return Paragraph.clean(repr(self.tag.get_text())) + "\n"    
-
 @addGrabber
 class Quote(BookElement):
     matchStr = "MsoQuote"
+
 
 @addGrabber
 class SolnsLink(BookElement):
@@ -381,8 +415,7 @@ Not for distribution
 # good with swiss: *borland, manni, perldoc, tango, autumn, bw
 # good with neon: monokai, manni, *perldoc, *default, *vs, *trac, 
 #                 *fruity, *autumn, emacs, **friendly, native
-# Introduction
-# ------------
+
 
 def buildSeminar(chapters):
     if not os.path.exists("slides"):
@@ -394,70 +427,18 @@ def buildSeminar(chapters):
         with file(fname, "w") as chapSlides:
             print >>chapSlides, slideChapterHeader(name)
             for el in chap.elements:
-                # if type(el) is Paragraph:
+                # if type(el) is Exercise:
                 #     print >>chapSlides, el
                 #     print >>chapSlides
-                    # print el
+                #     for piece in el.tag:
+                #         print >>chapSlides, repr(piece).replace("<br/>","")
+                #         print >>chapSlides
+                #     print el.adoc()
                 #     print
-                    # for x in el.tag:
-                    #     # print >>chapSlides, repr(x)
-                    #     # print >>chapSlides
-                    #     print repr(x)
-                    #     print
                 print >>chapSlides, el.adoc().replace(" ,", ",")
-                print el.adoc()
 
 
 if __name__ == "__main__":
     chapters = Chapter.chapterize(open("AtomicScalaCleaned.html", "rU").read())
-    # test = chapters["Comprehensions"]
-    # test = chapters["Functions as Objects"]
-    # print test.header()
-    # pprint(test.elements, trace)
     summarized = seminarSubset(chapters)
     buildSeminar(summarized)
-    # for chap in summarized.values():
-    #     print chap.header()
-    #     for el in chap.elements:
-    #         print el
-            # if type(el) is Example or type(el) is CodeFragment:
-            #   print el
-    #print test.elements[25]
-    # trace2 = file("_OutputTrace2.txt", "w")
-    # for e in test.soup:
-    #   print >>trace2, e
-    # test.trace(file("_OutputTrace3.txt", "w"))
-    # pprint(test.elements, file("Elements.txt", "w"))
-
-
-# def selectCode(cand):
-#   return (type(cand) is bs4.element.Tag and
-#     cand.has_key("class") and
-#     "CodeChar" in cand['class'] and
-#     len(cand.get_text()) > 4)
-
-
-# class Exercise(object):
-
-#   def __init__(self, chapter, soup):
-#     self.chapter = chapter
-#     self.soup = soup
-#     # Remove funky spaces:
-#     self.soup.find("span", {"style":'font:7.0pt "Times New Roman"'}).replace_with(" ")
-#     exn = self.soup.contents[0]
-#     if isinstance(exn, bs4.element.Tag):
-#       exn = exn.get_text()
-#     self.exerciseNumber = exn.split('.')[0] # Remove trailing period
-
-#     self.rawDescription = list(itertools.ifilterfalse(selectCode, self.soup.contents))
-#     self.description = ""
-#     for desc in self.rawDescription:
-#       if isinstance(desc, bs4.element.Tag):
-#         self.description += filter(lambda x: x in string.printable, desc.get_text())
-#       else:
-#         self.description += filter(lambda x: x in string.printable, desc)
-
-#     self.codes = list(itertools.ifilter(selectCode, self.soup.contents))
-
-#   def __repr__(self):
-#     return repr(self.description) + repr(self.codes)
